@@ -1,6 +1,5 @@
-import Image from "next/image";
-
 import PostList from "../components/PostList";
+import Counter from "../components/Counter";
 
 export default function Home() {
   return (
@@ -9,6 +8,7 @@ export default function Home() {
         <h1 className="mb-8 text-center text-3xl font-bold text-zinc-900 dark:text-zinc-100">
           Zustand Learning Playground
         </h1>
+        <Counter />
         <PostList />
       </main>
     </div>
