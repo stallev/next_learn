@@ -1,27 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { fetchPosts, Post } from '../services/api';
+import { useEffect } from 'react';
+import { usePostStore } from '../store/usePostStore';
 
 export default function PostList() {
-    const [posts, setPosts] = useState<Post[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { posts, loading, error, fetchPosts } = usePostStore();
+
 
     useEffect(() => {
-        const loadPosts = async () => {
-            try {
-                const data = await fetchPosts();
-                setPosts(data.slice(0, 10)); // Limit to 10 for better UI
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'An error occurred');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadPosts();
-    }, []);
+        if (posts.length === 0) {
+            fetchPosts();
+        }
+    }, [fetchPosts, posts.length]);
 
     if (loading) return <div className="p-4 text-center">Loading posts...</div>;
     if (error) return <div className="p-4 text-center text-red-500">Error: {error}</div>;
