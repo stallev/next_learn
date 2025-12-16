@@ -6,6 +6,7 @@ interface PostState {
     posts: Post[];
     loading: boolean;
     error: string | null;
+    lastUpdated: Date;
     fetchPosts: () => Promise<void>;
 }
 
@@ -14,8 +15,9 @@ export const usePostStore = create<PostState>()(
         posts: [],
         loading: false,
         error: null,
+        lastUpdated: new Date(),
         fetchPosts: async () => {
-            set({ loading: true, error: null });
+            set({ loading: true, error: null, lastUpdated: new Date() });
             try {
                 const posts = await fetchPosts();
                 set({ posts, loading: false });
