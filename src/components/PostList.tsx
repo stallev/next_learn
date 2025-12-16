@@ -2,10 +2,17 @@
 
 import { useEffect } from 'react';
 import { usePostStore } from '../store/usePostStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function PostList() {
-    const { posts, loading, error, fetchPosts } = usePostStore();
-
+    const { posts, loading, error, fetchPosts } = usePostStore(
+        useShallow((state) => ({
+            posts: state.posts,
+            loading: state.loading,
+            error: state.error,
+            fetchPosts: state.fetchPosts,
+        }))
+    );
 
     useEffect(() => {
         if (posts.length === 0) {
