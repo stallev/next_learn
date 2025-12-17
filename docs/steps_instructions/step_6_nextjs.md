@@ -12,21 +12,37 @@
 Вместо экспорта хука `useStore`, экспортируйте функцию `createStore`.
 
 ```typescript
-// src/store/counter-store.ts
+// src/store/store.ts
 import { createStore } from 'zustand/vanilla'
+import { devtools, persist, createJSONStorage } from 'zustand/middleware'
+import { createPostSlice } from './createPostSlice'
+import { createFavoriteSlice } from './createFavoriteSlice'
+import { createCounterStore as createCounterSlice } from './counter-store' // Переименовываем для ясности, так как это slice
+import type { PostSlice } from './createPostSlice'
+import type { FavoriteSlice } from './createFavoriteSlice'
+import type { CounterState } from './counter-store'
 
-export type CounterState = {
-  count: number
-  decrement: () => void
-  increment: () => void
-}
+export type AppState = PostSlice & FavoriteSlice & CounterState
 
-export const createCounterStore = (initState: CounterState = { count: 0 }) => {
-  return createStore<CounterState>()((set) => ({
-    ...initState,
-    decrement: () => set((state) => ({ count: state.count - 1 })),
-    increment: () => set((state) => ({ count: state.count + 1 })),
-  }))
+export const createAppStore = (initState: Partial<AppState> = {}) => {
+  return createStore<AppState>()(
+    devtools(
+      persist(
+        (...a) => ({
+          ...createPostSlice(...a),
+          ...createFavoriteSlice(...a),
+          ...createCounterSlice(...a),
+          ...initState,
+        }),
+        {
+          name: 'bound-store',
+          storage: createJSONStorage(() => 
+            typeof window !== 'undefined' ? localStorage : undefined
+          ), // Используем проверку window для безопасности на сервере (SSR)
+        }
+      )
+    )
+  )
 }
 ```
 
@@ -34,48 +50,53 @@ export const createCounterStore = (initState: CounterState = { count: 0 }) => {
 Нам нужно передать этот store через React Context, чтобы он был доступен в дереве компонентов, но создавался заново для каждого "прохода" рендеринга (на сервере — для каждого запроса).
 
 ```tsx
-// src/providers/counter-store-provider.tsx
-'use client'
+// src/providers/store-provider.tsx
+'use client' // Контекст работает только в клиентских компонентах
 
 import { type ReactNode, createContext, useRef, useContext } from 'react'
 import { useStore } from 'zustand'
-import { type CounterState, createCounterStore } from '@/store/counter-store'
+import { type AppState, createAppStore } from '@/store/store' // Импортируем наш собранный стор
 
-export type CounterStoreApi = ReturnType<typeof createCounterStore>
+export type AppStoreApi = ReturnType<typeof createAppStore>
 
-export const CounterStoreContext = createContext<CounterStoreApi | undefined>(
+// Создаем контекст для стора
+export const AppStoreContext = createContext<AppStoreApi | undefined>(
   undefined,
 )
 
-export interface CounterStoreProviderProps {
+export interface AppStoreProviderProps {
   children: ReactNode
 }
 
-export const CounterStoreProvider = ({
+export const AppStoreProvider = ({
   children,
-}: CounterStoreProviderProps) => {
-  const storeRef = useRef<CounterStoreApi>()
+}: AppStoreProviderProps) => {
+  // useRef гарантирует, что стор будет создан только один раз для компонента
+  // Но так как провайдер будет в корне, он создастся один раз на сессию клиента (SPA)
+  // или один раз на запрос сервера (SSR)
+  const storeRef = useRef<AppStoreApi>()
   if (!storeRef.current) {
-    storeRef.current = createCounterStore()
+    storeRef.current = createAppStore()
   }
 
   return (
-    <CounterStoreContext.Provider value={storeRef.current}>
+    <AppStoreContext.Provider value={storeRef.current}>
       {children}
-    </CounterStoreContext.Provider>
+    </AppStoreContext.Provider>
   )
 }
 
-export const useCounterStore = <T,>(
-  selector: (store: CounterState) => T,
+// Хук для использования стора в компонентах
+export const useAppStore = <T,>(
+  selector: (store: AppState) => T,
 ): T => {
-  const counterStoreContext = useContext(CounterStoreContext)
+  const appStoreContext = useContext(AppStoreContext)
 
-  if (!counterStoreContext) {
-    throw new Error(`useCounterStore must be used within CounterStoreProvider`)
+  if (!appStoreContext) {
+    throw new Error(`useAppStore must be used within AppStoreProvider`)
   }
 
-  return useStore(counterStoreContext, selector)
+  return useStore(appStoreContext, selector)
 }
 ```
 
@@ -84,19 +105,52 @@ export const useCounterStore = <T,>(
 
 ```tsx
 // src/app/layout.tsx
-import { CounterStoreProvider } from '@/providers/counter-store-provider'
+import { AppStoreProvider } from '@/providers/store-provider'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <CounterStoreProvider>
+        {/* Оборачиваем все приложение, чтобы стор был доступен везде */}
+        <AppStoreProvider>
           {children}
-        </CounterStoreProvider>
+        </AppStoreProvider>
       </body>
     </html>
   )
 }
 ```
 
-Теперь состояние безопасно для SSR и изолировано.
+Теперь состояние безопасно для SSR и изолировано. Компоненты могут использовать `useAppStore` вместо прямого импорта `useBoundStore`.
+
+### 4. Использование в компонентах (Best Practices)
+
+Для оптимизации рендеринга при выборе нескольких полей используйте `useShallow`. Это предотвратит лишние обновления, если изменились поля, которые вы не используете.
+
+```tsx
+// src/components/counter.tsx
+'use client'
+
+import { useAppStore } from '@/providers/store-provider'
+import { useShallow } from 'zustand/react/shallow'
+
+export const Counter = () => {
+  // Используем useShallow для выбора объекта
+  // Компонент перерисуется, только если изменится count или decrement/increment (а функции стабильны)
+  const { count, decrement, increment } = useAppStore(
+    useShallow((state) => ({
+      count: state.count,
+      decrement: state.decrement,
+      increment: state.increment,
+    }))
+  )
+
+  return (
+    <div>
+      Count: {count}
+      <button onClick={decrement}>-</button>
+      <button onClick={increment}>+</button>
+    </div>
+  )
+}
+```
