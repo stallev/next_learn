@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { Post, fetchPosts } from "../services/api";
 import { devtools } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 interface PostState {
     posts: Post[];
@@ -8,10 +9,12 @@ interface PostState {
     error: string | null;
     lastUpdated: Date;
     fetchPosts: () => Promise<void>;
+    favorites: number[];
+    toggleFavorite: (id: number) => void;
 }
 
 export const usePostStore = create<PostState>()(
-    devtools((set) => ({
+    devtools(persist((set) => ({
         posts: [],
         loading: false,
         error: null,
@@ -25,6 +28,20 @@ export const usePostStore = create<PostState>()(
                 set({ error: (error as Error).message, loading: false });
             }
         },
+        favorites: [],
+        toggleFavorite: (id: number) => set((state) => ({
+            favorites: state.favorites.includes(id)
+                ? state.favorites.filter((favId) => favId !== id)
+                : [...state.favorites, id],
+        })),
     }),
-        { name: 'Post Store' })
+        {
+            name: 'Post Store',
+            storage: createJSONStorage(() => localStorage),
+            partialize: (state) => ({
+                posts: state.posts,
+                favorites: state.favorites,
+            }),
+        }),
+    )
 )
