@@ -2,32 +2,31 @@
 
 import { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useBoundStore } from '../store/useBoundStore';
-import useStore from '../hooks/useStore';
+import { useAppStore } from '../providers/store-provider';
 
 export default function PostList() {
-    const storeData = useStore(
-        useBoundStore,
+    const state = useAppStore(
         useShallow((state) => ({
             posts: state.posts,
             loading: state.loading,
             error: state.error,
             fetchPosts: state.fetchPosts,
             favorites: state.favorites,
-            toggleFavorite: state.toggleFavorite,
+            toggleFavorite: state.toggleFavorite
         }))
     );
 
     useEffect(() => {
-        if (storeData && storeData.posts.length === 0) {
-            storeData.fetchPosts();
+        if (state?.posts.length === 0) {
+            state.fetchPosts();
         }
-    }, [storeData]);
+    }, [state?.posts.length, state?.fetchPosts]);
 
-    // If storeData is undefined (during hydration), render a fallback or nothing
-    if (!storeData) return <div>Loading store...</div>;
+    if (!state) return <div className="p-4 text-center">Loading store...</div>;
 
-    const { posts, loading, error, favorites, toggleFavorite } = storeData;
+    const { posts, loading, error, favorites, toggleFavorite } = state;
+
+
 
     if (loading) return <div className="p-4 text-center">Loading posts...</div>;
     if (error) return <div className="p-4 text-center text-red-500">Error: {error}</div>;

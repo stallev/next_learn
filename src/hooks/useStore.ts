@@ -1,17 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
+import { useStore as useZustandStore } from 'zustand'
 
-const useStore = <T, F>(
-    store: (callback: (state: T) => unknown) => unknown,
+export const useStore = <T, F>(
+    store: any,
     callback: (state: T) => F
 ) => {
-    const result = store(callback) as F;
-    const [data, setData] = useState<F>();
+    const result = useZustandStore(store, callback as any) as F
+    const [data, setData] = useState<F>()
 
     useEffect(() => {
-        setData(result);
-    }, [result]);
+        setData(result)
+    }, [result])
 
-    return data;
-};
-
-export default useStore;
+    return data
+}

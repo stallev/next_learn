@@ -1,9 +1,22 @@
 'use client';
 
-import { useCounterStore } from '../store/useCounterStore';
+import { useAppStore } from '../providers/store-provider';
+import { useShallow } from 'zustand/react/shallow';
 
 export default function Counter() {
-    const { count, increase, reset } = useCounterStore();
+    const state = useAppStore(
+        useShallow((state) => ({
+            count: state.count,
+            increase: state.increase,
+            reset: state.reset,
+        }))
+    );
+
+    if (!state) {
+        return <div>Loading...</div>
+    }
+
+    const { count, increase, reset } = state
 
     return (
         <div className="p-4 border rounded-lg">
