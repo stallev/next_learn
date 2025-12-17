@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePostStore } from '../store/usePostStore';
 import { useShallow } from 'zustand/react/shallow';
+import { useBoundStore } from '../store/useBoundStore';
 import useStore from '../hooks/useStore';
 
 export default function PostList() {
     const storeData = useStore(
-        usePostStore,
+        useBoundStore,
         useShallow((state) => ({
             posts: state.posts,
             loading: state.loading,
